@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cookhouse Checklist</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@0.9.0/css/bulma.min.css"
+    />
+  </head>
+  <body>
+    <main id="app">
+      <section class="section" v-if="responseArray.length > 0">
+        <div class="container">
+          <h1 class="title">
+            Cookhouse Checklist
+          </h1>
+          <br />
+          <div class="field">
+            <label class="label">Cookhouse</label>
+            <div class="select is-fullwidth">
+              <select v-model="selectedCookhouse" @change="onCookhouseChange">
+                <option v-for="cookhouse in cookhouseList" :key="cookhouse">
+                  {{cookhouse}}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Date</label>
+            <div class="select is-fullwidth">
+              <select v-model="selectedResponse">
+                <option
+                  v-for="response in filteredResponseByCookhouseList"
+                  :key="response[0].data"
+                  :value="response"
+                >
+                  {{response[3].data}} {{response[4].data}}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div class="card" v-if="selectedResponse">
+            <div class="card-content">
+              <p class="title">
+                Response Data
+              </p>
+              <hr />
+              <table class="table is-striped is-fullwidth">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Response</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in selectedResponse" :key="item.title">
+                    <td>{{item.title}}</td>
+                    <td>{{item.data}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      new Vue({
+        el: "#app",
+        data() {
+          return {
+            sheetDataArray: [],
+            columnTitleArray: [],
+            responseArray: [],
+            cookhouseList: null,
+            selectedResponse: null,
+            selectedCookhouse: null,
+          };
+        },
+        computed: {
+          filteredResponseByCookhouseList() {
+            const retArray = [];
+            if (this.selectedCookhouse) {
+              for (const response of this.responseArray) {
+                if (response[1].data === this.selectedCookhouse) {
+                  retArray.push(response);
+                }
+              }
+            }
+            return retArray;
+          },
+        },
+        async created() {
+          const res = await fetch(
+            "https://spreadsheets.google.com/feeds/cells/1zjfuX-bzprgiDvV0l0sIHEGCgzT9xRafL4Swu7kbIjI/1/public/full?alt=json"
+          );
+          const resData = await res.json();
+          this.sheetDataArray = resData.feed.entry;
+          this.cookhouseList = new Set();
+          this.setColumnTitleArray();
+          this.setResponsesArray();
+        },
+        methods: {
+          setColumnTitleArray() {
+            // We have a max of 97 possible options thus we stop after retrieving the first 97 columns of the first row
+            for (let index = 0; index < 97; index++) {
+              this.columnTitleArray.push(
+                this.sheetDataArray[index].gs$cell.inputValue
+              );
+            }
+          },
+          setResponsesArray() {
+            // We want to break the responses down to individual objects before placing them in responseArray
+            // We start at 97 as the elements before are titles
+            // We start at row 2 as the first row contains titles
+            let currRow = "2";
+            let tmpObjArray = [];
+            for (let index = 97; index < this.sheetDataArray.length; index++) {
+              const cellData = this.sheetDataArray[index];
+              if (cellData.gs$cell.row === currRow) {
+                //This cell is within the same row
+                const colTitle = this.columnTitleArray[
+                  parseInt(cellData.gs$cell.col) - 1
+                ];
+                const colData = cellData.gs$cell.inputValue;
+                if (colTitle === "Cookhouse") {
+                  this.cookhouseList.add(colData);
+                }
+                const tmpObj = {
+                  title: colTitle,
+                  data: colData,
+                };
+                tmpObjArray.push(tmpObj);
+              } else {
+                // We have moved on to the next row. Thus, we want to push tmpObjArray to responseArray before proceeding
+                this.responseArray.push([...tmpObjArray]);
+                tmpObjArray = [];
+                const colTitle = this.columnTitleArray[
+                  parseInt(cellData.gs$cell.col) - 1
+                ];
+                const colData = cellData.gs$cell.inputValue;
+                const tmpObj = {
+                  title: colTitle,
+                  data: colData,
+                };
+                tmpObjArray.push(tmpObj);
+                currRow = cellData.gs$cell.row;
+              }
+            }
+          },
+          onCookhouseChange() {
+            this.selectedResponse = null;
+          },
+        },
+      });
+    </script>
+  </body>
+</html>
