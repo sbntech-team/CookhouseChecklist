@@ -83,13 +83,11 @@
         },
         computed: {
           filteredResponseByCookhouseList() {
-            const retArray = [];
+            let retArray = [];
             if (this.selectedCookhouse) {
-              for (const response of this.responseArray) {
-                if (response[1].data === this.selectedCookhouse) {
-                  retArray.push(response);
-                }
-              }
+              retArray = this.responseArray.filter(
+                (res) => res[1].data === this.selectedCookhouse
+              );
             }
             return retArray;
           },
@@ -137,7 +135,8 @@
                 tmpObjArray.push(tmpObj);
               } else {
                 // We have moved on to the next row. Thus, we want to push tmpObjArray to responseArray before proceeding
-                this.responseArray.push([...tmpObjArray]);
+                if (tmpObjArray.length !== 0)
+                  this.responseArray.push([...tmpObjArray]);
                 tmpObjArray = [];
                 const colTitle = this.columnTitleArray[
                   parseInt(cellData.gs$cell.col) - 1
