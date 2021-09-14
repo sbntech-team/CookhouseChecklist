@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -12,6 +13,7 @@
   </head>
   <body>
     <main id="app">
+      <button @click="onButtonClick">Load data</button>
       <section class="section">
         <div class="container">
           <h1 class="title">Cookhouse Checklist</h1>
@@ -30,11 +32,9 @@
             <label class="label">Date</label>
             <div class="select is-fullwidth">
               <select v-model="selectedResponse">
-                <option
-                  v-for="response in filteredResponseByCookhouseList"
-                  :key="response[0].data"
-                  :value="response"
-                >
+                <option v-for="response in filteredResponseByCookhouseList"
+                        :key="response[0].data"
+                        :value="response">
                   {{response[3].data}} {{response[4].data}}
                 </option>
               </select>
@@ -63,9 +63,9 @@
         </div>
       </section>
     </main>
-
+    <script src="https://apis.google.com/js/api.js"></script>
     <script>
-      new Vue({
+      const v = new Vue({
         el: "#app",
         data() {
           return {
@@ -89,23 +89,22 @@
           },
         },
         async created() {
-          const res = await fetch(
-            "https://spreadsheets.google.com/feeds/cells/1zjfuX-bzprgiDvV0l0sIHEGCgzT9xRafL4Swu7kbIjI/1/public/full?alt=json"
-          );
-          const resData = await res.json();
-          this.sheetDataArray = resData.feed.entry;
-          this.cookhouseList = new Set();
-          this.setColumnTitleArray();
-          this.setResponsesArray();
+          await gapi.load("client:auth2", function () {
+            gapi.auth2.init({ client_id: "130635014491-sq1i1octhrpj3u5eegkq11vqssgha5aq.apps.googleusercontent.com" });
+          });
         },
         methods: {
+          onButtonClick(){
+            this.authenticate().then(this.loadClient).then(this.execute).then(this.afterLogin);
+          },
+          afterLogin() {
+            this.cookhouseList = new Set();
+            this.setColumnTitleArray();
+            this.setResponsesArray();
+          },
           setColumnTitleArray() {
             // We have a max of 97 possible options thus we stop after retrieving the first 97 columns of the first row
-            for (let index = 0; index < 97; index++) {
-              this.columnTitleArray.push(
-                this.sheetDataArray[index].gs$cell.inputValue
-              );
-            }
+            v.columnTitleArray = v.sheetDataArray[0];
           },
           setResponsesArray() {
             // We want to break the responses down to individual objects before placing them in responseArray
@@ -113,43 +112,50 @@
             // We start at row 2 as the first row contains titles
             let currRow = "2";
             let tmpObjArray = [];
-            for (let index = 97; index < this.sheetDataArray.length; index++) {
-              const cellData = this.sheetDataArray[index];
-              if (cellData.gs$cell.row === currRow) {
-                //This cell is within the same row
-                const colTitle = this.columnTitleArray[
-                  parseInt(cellData.gs$cell.col) - 1
-                ];
-                const colData = cellData.gs$cell.inputValue;
-                if (colTitle === "Cookhouse") {
-                  this.cookhouseList.add(colData);
+            for (let row = 1; row < v.sheetDataArray.length; row++) {
+              this.responseArray.push([]);
+              for (let j = 0; j < v.sheetDataArray[row].length; j++) {
+                let tmpObj = {
+                  title: v.sheetDataArray[0][j],
+                  data: v.sheetDataArray[row][j],
+                };
+                this.responseArray[row - 1].push(tmpObj);
+                if (v.sheetDataArray[0][j] === "Cookhouse") {
+                  this.cookhouseList.add(v.sheetDataArray[row][j]);
                 }
-                const tmpObj = {
-                  title: colTitle,
-                  data: colData,
-                };
-                tmpObjArray.push(tmpObj);
-              } else {
-                // We have moved on to the next row. Thus, we want to push tmpObjArray to responseArray before proceeding
-                if (tmpObjArray.length !== 0)
-                  this.responseArray.push([...tmpObjArray]);
-                tmpObjArray = [];
-                const colTitle = this.columnTitleArray[
-                  parseInt(cellData.gs$cell.col) - 1
-                ];
-                const colData = cellData.gs$cell.inputValue;
-                const tmpObj = {
-                  title: colTitle,
-                  data: colData,
-                };
-                tmpObjArray.push(tmpObj);
-                currRow = cellData.gs$cell.row;
               }
             }
           },
           onCookhouseChange() {
             this.selectedResponse = null;
           },
+          authenticate() {
+            return gapi.auth2.getAuthInstance()
+              .signIn({ scope: "https://www.googleapis.com/auth/spreadsheets.readonly" })
+              .then(function () { console.log("Sign-in successful"); },
+                function (err) { console.error("Error signing in", err); });
+          },
+          loadClient() {
+            gapi.client.setApiKey("AIzaSyCFG3Jua0zPU_rcZPUpseT1v5L5JA5wuog");
+            return gapi.client.load("https://sheets.googleapis.com/$discovery/rest?version=v4")
+              .then(function () { console.log("GAPI client loaded for API"); },
+                function (err) { console.error("Error loading GAPI client for API", err); });
+          },
+          // Make sure the client is loaded and sign-in is complete before calling this method.
+          execute() {
+            return gapi.client.sheets.spreadsheets.values.get({
+              "spreadsheetId": "1zjfuX-bzprgiDvV0l0sIHEGCgzT9xRafL4Swu7kbIjI",
+              "range": "A:CS",
+              "dateTimeRenderOption": "FORMATTED_STRING",
+              "majorDimension": "ROWS",
+              "valueRenderOption": "FORMATTED_VALUE"
+            })
+              .then(function (response) {
+                // Handle the results here (response.result has the parsed body).
+                v.sheetDataArray = response.result.values.filter((row) => row.length > 1);
+            },
+              function (err) { console.error("Execute error", err); });
+          }
         },
       });
     </script>
