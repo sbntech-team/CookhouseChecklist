@@ -86,7 +86,7 @@
         },
         async created() {
           const res = await fetch(
-            "https://sheets.googleapis.com/v4/spreadsheets/1zjfuX-bzprgiDvV0l0sIHEGCgzT9xRafL4Swu7kbIjI/values/Form%20Responses%201?alt=json&key=AIzaSyCFG3Jua0zPU_rcZPUpseT1v5L5JA5wuog"
+            "https://sheets.googleapis.com/v4/spreadsheets/1zYq1TEda35_2zQgrxauwlEDjrVf_8b6z6zaQyZaI_EE/values/Form%20Responses%201?alt=json&key=AIzaSyCFG3Jua0zPU_rcZPUpseT1v5L5JA5wuog"
           );
           const resData = await res.json();
           this.sheetDataArray = resData.values;
